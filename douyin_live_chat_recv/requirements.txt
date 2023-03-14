@@ -1,0 +1,5 @@
+brotli
+nodejs-bin
+protobuf
+requests
+websocket-client
