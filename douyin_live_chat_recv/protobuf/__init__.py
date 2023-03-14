@@ -8,7 +8,9 @@ from json import loads
 from pathlib import Path
 from multiprocessing.connection import Client
 from subprocess import Popen
+from tempfile import gettempdir
 from threading import Lock
+from uuid import uuid4
 
 from nodejs import node
 
@@ -19,7 +21,9 @@ from . import douyin_pb2
 SCRIPT_PATH =  str(Path(__file__).parents[1] / 'js' / 'pb' / 'cli.js')
 
 
-def make_parser(address='douyin-chat.sock'):
+def make_parser(address=None):
+    if address is None:
+        address = path.join(gettempdir(), f"{uuid4()}.sock")
     def gen_client():
         if path.exists(address):
             remove(address)
