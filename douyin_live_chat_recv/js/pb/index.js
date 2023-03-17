@@ -72,7 +72,13 @@ function processMultipartData(process) {
 }
 
 // TODO: 后续需要 gzip 压缩
-function parseResponseServer(address="douyin-chat.sock") {
+function parseResponseServer(address) {
+    if ( address === undefined ) {
+        if ( process.platform === 'win32' )
+            address = "\\\\.\\pipe\\douyin-chat.pipe"
+        else
+            address = "douyin-chat.sock"
+    }
     const server = createServer(function(socket) {
         socket.on('data', processMultipartData(data => {
             let result;
@@ -90,7 +96,13 @@ function parseResponseServer(address="douyin-chat.sock") {
     return server;
 }
 
-function parseMessageServer(address="douyin-chat.sock") {
+function parseMessageServer(address) {
+    if ( address === undefined ) {
+        if ( process.platform === 'win32' )
+            address = "\\\\.\\pipe\\douyin-chat.pipe"
+        else
+            address = "douyin-chat.sock"
+    }
     const server = createServer(function(socket) {
         socket.on('data', processMultipartData(data => {
             let result;

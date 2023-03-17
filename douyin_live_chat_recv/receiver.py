@@ -213,18 +213,19 @@ class DouyinLiveChatReceiver:
 
     def run(self):
         "启动（同时最多运行一个）"
+        logger = self.logger
         try:
             self.refresh()
         except KeyError:
             raise InvalidLive("Invalid live")
-        self.logger.info(f"🎆live data: {self.liveinfo}")
+        if logger:
+            logger.info(f"🎆live data: {self.liveinfo}")
 
         if self._running:
             raise RuntimeError("Already running!")
         self._running = True
         try:
             self.parse_message, close_parser = make_parser()
-            sleep(0.1)
             websocket.enableTrace(False)
             WebSocketUrl = 'wss://webcast3-ws-web-lq.douyin.com/webcast/im/push/v2/'
             params = {
@@ -264,11 +265,15 @@ class DouyinLiveChatReceiver:
                 on_data=getattr(self, 'on_data', None), 
                 header=headers, 
             )
-            self.logger.info("🎆Websocket client started, press <CTRL>+<C> "
-                             "or call .stop() method to stop")
+            if logger:
+                logger.info("🎆Websocket client started, press <CTRL>+<C> "
+                            "or call .stop() method to stop")
             ws.run_forever()
         finally:
-            close_parser()
+            try:
+                close_parser()
+            except UnboundLocalError:
+                pass
             self._running = False
 
     def start(self, run_in_thread=False):
@@ -287,8 +292,12 @@ class DouyinLiveChatReceiver:
         except (AttributeError, websocket.WebSocketConnectionClosedException):
             pass
 
-    def run_forever(self):
+    def run_forever(self, run_in_thread=False):
         "启动，失败会重启"
+        if run_in_thread:
+            t = Thread(target=self.run_forever)
+            t.start()
+            return t
         self._quit = False
         logger = self.logger
         while not self._quit:

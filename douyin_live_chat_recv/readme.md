@@ -61,6 +61,85 @@ $ python douyin_live_chat_recv https://live.douyin.com/401818337019
 from douyin_live_chat_recv import DouyinLiveChatReceiver
 ```
 
+你也可以在新线程中启动实例，然后在主线程中关闭
+
+```python
+instance = DouyinLiveChatReceiver("https://live.douyin.com/1234567890")
+
+# 普通的启动和关闭，一旦出错，就推出，比如直播间关闭
+instance.start(run_in_thread=True) # 启动，在新线程
+...
+instance.close() # 关闭
+
+# 长期的启动和关闭，出现错误，会每隔一秒重试
+instance.run_forever(run_in_thread=True) # 启动，在新线程
+...
+instance.quit_forever() # 关闭
+```
+
+当实例启动以后，会每 10 秒钟更新一次直播间信息，即 `liveinfo` 实例属性。
+
+与直播间有关的一些实例属性如下：
+```python
+liveinfo # 直播信息
+roominfo = liveinfo['app']['initialState']['roomStore']['roomInfo'] # 直播的房间信息
+roomid = roominfo['roomId'] # 直播的房间id
+roomtitle = roominfo['room']['title'] # 直播的房间标题
+status = roominfo['room']['status'] # 直播状态，如果等于 2 ，那么说明正在播
+```
+
+`DouyinLiveChatReceiver.__init__` 有一个参数 `send`，会对接收到的每一条消息（暂记作 `message`）（准确地说是 **Webcast** 消息），分别作为参数然后调用一次（`send(message)`）。因此，如果你需要收集、转发、处理这些消息，那么请提供一下这个可调用对象给这个参数 `send`。
+
+例如：
+
+```python
+from datetime import datetime
+from douyin_live_chat_recv import DouyinLiveChatReceiver
+
+def send(message):
+    if message.get('error'):
+        return
+    method = message["common"]["method"]
+    if method == "WebcastChatMessage":
+        userid = message['user']['shortId']
+        username = message['user']['nickname']
+        value = message['content']
+        print(f"[{datetime.now()}]【评论】[{userid}]{username!r}: {value!r}")
+    elif method == "WebcastFansclubMessage":
+        userid = message['user']['shortId']
+        username = message['user']['nickname']
+        value = message['content']
+        print(f"[{datetime.now()}]【粉丝团】[{userid}]{username!r}: {value!r}")
+    elif method == "WebcastGiftMessage":
+        userid = message['user']['shortId']
+        username = message['user']['nickname']
+        value = message['gift']['name']
+        count = message['gift']['diamondCount']
+        print(f"[{datetime.now()}]【送礼】[{userid}]{username!r}: {value!r} × {count}")
+    elif method == "WebcastLikeMessage":
+        userid = message['user']['shortId']
+        username = message['user']['nickname']
+        print(f"[{datetime.now()}]【点赞】[{userid}]{username!r}")
+    elif method == "WebcastMemberMessage":
+        userid = message['user']['shortId']
+        username = message['user']['nickname']
+        print(f"[{datetime.now()}]【进入】[{userid}]{username!r}")
+    elif method == 'WebcastRoomIntroMessage':
+        content = message['intro']
+        print(f"[{datetime.now()}]【广告】{content!r}")
+    elif method == "WebcastRoomMessage":
+        content = message['content']
+        print(f"[{datetime.now()}]【通知】{content!r}")
+    elif method == "WebcastSocialMessage":
+        userid = message['user']['shortId']
+        username = message['user']['nickname']
+        print(f"[{datetime.now()}]【关注】[{userid}]{username!r}")
+    else:
+        ...
+
+DouyinLiveChatReceiver("https://live.douyin.com/1234567890", send=send).start()
+```
+
 帮助说明如下：
 
 ```
