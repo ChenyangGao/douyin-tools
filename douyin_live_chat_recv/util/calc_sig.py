@@ -3,12 +3,16 @@
 
 __all__ = ["calc_sig"]
 
+import asyncio
+
 from json import dumps, loads
 from pathlib import Path
 from subprocess import PIPE
 from urllib.parse import quote
 
 from nodejs import node
+
+from .browser import ctx_browser
 
 
 JSDIR = str(Path(__file__).parent.with_name("js"))
@@ -54,18 +58,20 @@ console.log(JSON.stringify(_mod.o(%(jsdata)s, %(len)d)))''' % dict(jsdata=dumps(
 
 
 def calc_sign(payload={}):
-    cmd = '''\
-window = global;
-Request = {};
-Headers = {};
-document = {};
-document.addEventListener = function(){};
-_mod = require("./webmssdk.js");
-navigator = {"userAgent": ""};
-console.log(JSON.stringify(_mod.frontierSign(%(jsdata)s)))
-process.exit()''' % dict(jsdata=dumps(payload))
-    r = node.run(["--no-warnings", "-e", cmd], stdout=PIPE, check=True, cwd=JSDIR)
-    return loads(r.stdout)
+    async def intercept(request):
+        if request.resourceType in ("image", "media", "eventsource", "websocket", "stylesheet", "font"):
+            await request.abort()
+        else:
+            await request.continue_()
+    async def calc():
+        async with ctx_browser({"headless": True}) as browser:
+            pages = await browser.pages()
+            page = pages[0]
+            await page.setRequestInterception(True)
+            page.on('request', lambda req: asyncio.ensure_future(intercept(req)))
+            await page.goto('https://live.douyin.com')
+            return (await page.evaluate(f'window.byted_acrawler.frontierSign({dumps(payload)})'))
+    return asyncio.new_event_loop().run_until_complete(calc())
 
 
 def calc_sig(s):
@@ -77,6 +83,7 @@ def calc_sig(s):
             for k, v in s.items())
     else:
         b = bytes(s)
+    
     ms_stub = calc_ms_stub(b)
     sign = calc_sign(ms_stub)
     return sign['X-Bogus']
